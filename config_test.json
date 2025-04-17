@@ -1,0 +1,18 @@
+{
+    "input_size": 3,
+    "hidden_size": 1,
+    "output_size": 1,
+    "num_layers": 1,
+    "state_dict": {
+        "net.0.weight": [
+            [
+                2.0,
+                3.0,
+                -5.0
+            ]
+        ],
+        "net.0.bias": [
+            -1.0
+        ]
+    }
+}
