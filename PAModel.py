@@ -4,12 +4,7 @@ from z3 import *
 
 class PAModel:
     def __init__(self, vars, formula_str, model, pos_data=None, neg_data=None):
-        """
-        :param vars: 变量名列表 (如 ['x','y','z'])
-        :param formula_str: Z3公式字符串 (如 "x + y == z")
-        :param pos_data: 正例数据集 (整数列表/张量)
-        :param neg_data: 反例数据集 (整数列表/张量)
-        """
+
         self.vars = vars
         self.z3_vars = {v: Int(v) for v in vars}
         self.z3_formula = eval(formula_str, {'__builtins__': None}, self.z3_vars)
@@ -88,36 +83,36 @@ class PAModel:
     def save_config(self, file_path, save_weights=False):
         self.model.save_config(file_path, save_weights)
 
-def combine_presburger_models(M1, M2):
-    """
-    合并两个PresburgerModel对象，处理共享变量y,z
-    :param M1: 含变量x,y,z的模型
-    :param M2: 含变量y,z,w的模型
-    :return: 含变量x,y,z,w的新模型M3
-    """
-    # 合并变量（保持共享变量y,z的一致性）
-    new_vars = ['x'] + sorted(list(set(M1.variables) & set(M2.variables))) + ['w']  # ['x','y','z','w']
+# def combine_presburger_models(M1, M2):
+#     """
+#     合并两个PresburgerModel对象，处理共享变量y,z
+#     :param M1: 含变量x,y,z的模型
+#     :param M2: 含变量y,z,w的模型
+#     :return: 含变量x,y,z,w的新模型M3
+#     """
+#     # 合并变量（保持共享变量y,z的一致性）
+#     new_vars = ['x'] + sorted(list(set(M1.variables) & set(M2.variables))) + ['w']  # ['x','y','z','w']
     
-    # 构建新公式（示例使用逻辑与组合，实际可根据需求修改）
-    new_formula = f"And({M1.formula_str}, {M2.formula_str})"
+#     # 构建新公式（示例使用逻辑与组合，实际可根据需求修改）
+#     new_formula = f"And({M1.formula_str}, {M2.formula_str})"
     
-    # 构建集成神经网络（使用PyTorch的ModuleList）
-    class IntegratedModel(nn.Module):
-        def __init__(self, model1, model2):
-            super().__init__()
-            self.model1 = model1.model
-            self.model2 = model2.model
-            self.combine = nn.Linear(2, 1)  # 集成两个模型的输出
+#     # 构建集成神经网络（使用PyTorch的ModuleList）
+#     class IntegratedModel(nn.Module):
+#         def __init__(self, model1, model2):
+#             super().__init__()
+#             self.model1 = model1.model
+#             self.model2 = model2.model
+#             self.combine = nn.Linear(2, 1)  # 集成两个模型的输出
             
-        def forward(self, x):
-            # 分割输入：x[0]对应x, x[1:3]对应y,z, x[3]对应w
-            out1 = self.model1(x[[0,1,2]])  # M1处理x,y,z
-            out2 = self.model2(x[[1,2,3]])  # M2处理y,z,w
-            return torch.sigmoid(self.combine(torch.cat([out1, out2], dim=1)))
+#         def forward(self, x):
+#             # 分割输入：x[0]对应x, x[1:3]对应y,z, x[3]对应w
+#             out1 = self.model1(x[[0,1,2]])  # M1处理x,y,z
+#             out2 = self.model2(x[[1,2,3]])  # M2处理y,z,w
+#             return torch.sigmoid(self.combine(torch.cat([out1, out2], dim=1)))
     
-    # 创建新模型实例
-    integrated_nn = IntegratedModel(M1, M2)
-    return PAModel(integrated_nn, new_formula, new_vars)
+#     # 创建新模型实例
+#     integrated_nn = IntegratedModel(M1, M2)
+#     return PAModel(integrated_nn, new_formula, new_vars)
 
 if __name__ == "__main__":
     # 定义整数变量和公式

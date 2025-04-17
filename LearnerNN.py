@@ -78,7 +78,7 @@ class LearnerNN(nn.Module):
         with torch.no_grad():
             return self(data).item() < 0.5
         
-    def save_config(self, file_path, save_weights=False):
+    def save_config(self, file_path, save_weights=True):
         """保存配置到JSON文件"""
         config = {
             "input_size": self.input_size,
