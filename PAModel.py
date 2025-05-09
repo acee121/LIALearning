@@ -2,8 +2,10 @@ import torch
 import torch.nn as nn
 from z3 import *
 
+model_path = "models"  # 模型保存路径
+
 class PAModel:
-    def __init__(self, vars, formula_str, model, pos_data=None, neg_data=None):
+    def __init__(self, vars, formula_str, model=None, pos_data=None, neg_data=None):
 
         self.vars = vars
         self.z3_vars = {v: Int(v) for v in vars}
@@ -11,7 +13,14 @@ class PAModel:
 
         self.pos_data = pos_data if pos_data else None
         self.neg_data = neg_data if neg_data else None
-        self.model = model
+        if model:
+            self.model = model
+
+    def _init_from_path(self, path):
+        if not path.exists():
+            raise FileNotFoundError(f"Model file {path} does not exist.")
+        
+        self.model = torch.load(path)
 
     def train(self, epochs=100):
 
@@ -80,8 +89,13 @@ class PAModel:
 
         # TODO: 训练策略改为增量学习
 
-    def save_config(self, file_path, save_weights=False):
-        self.model.save_config(file_path, save_weights)
+    def save_config(self, file_path, save_weights=True):
+        file_path = f"{model_path}/{file_path}"
+        if save_weights:
+            # 保存模型权重
+            torch.save(self.model, file_path)
+        else:
+            torch.save(self.model.state_dict(), file_path)
 
 # def combine_presburger_models(M1, M2):
 #     """
