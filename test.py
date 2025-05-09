@@ -1,5 +1,4 @@
 import torch
-import torch.nn as nn
 from LearnerNN import LearnerNN
 from PAModel import PAModel
 
@@ -13,14 +12,16 @@ if __name__ == "__main__":
     vars_1 = ['x', 'y', 'z']
     formula_1 = "2*x + 3*y - 5*z < 1"
 
-    pos_1 = [[1, 1, 1], [0, 0, 0]]
-    neg_1 = [[1, 1, 2], [2, 2, 5]]
+    data_1 = [
+        [[1, 1, 1], [0, 0, 0], [1, 1, 2], [2, 2, 5]],
+        [1,1,0,0]
+    ]
 
     model_1 = LearnerNN([2, 3, -5], -1).to(device)
-    loaded_params = torch.load(f"{model_path}/atom_model_1.pth")
-    model_1.load_state_dict(loaded_params)
-    Learner_1 = PAModel(vars_1, formula_1, model_1, pos_1, neg_1)
-    # Learner_1.save_config("atom_model_1.pth", save_weights=False)
+    # loaded_params = torch.load(f"{model_path}/atom_model_1.pth")
+    # model_1.load_state_dict(loaded_params)
+    Learner_1 = PAModel(vars_1, formula_1, model_1, data_1)
+    Learner_1.save_config()
 
     for i in range(10):
         print(f"{i}:"+str()+str(Learner_1.predict([2, 2, i]))+" "+str(Learner_1.verify([2, 2, i])))

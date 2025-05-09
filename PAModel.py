@@ -1,18 +1,22 @@
 import torch
 import torch.nn as nn
 from z3 import *
+from utils import z3tools
 
-model_path = "models"  # 模型保存路径
+formula_path = "formulas"
+model_path = "models"
+data_path = "datasets"
 
 class PAModel:
-    def __init__(self, vars, formula_str, model=None, pos_data=None, neg_data=None):
+    def __init__(self, formula_file, model=None, data=None):
 
-        self.vars = vars
-        self.z3_vars = {v: Int(v) for v in vars}
-        self.z3_formula = eval(formula_str, {'__builtins__': None}, self.z3_vars)
+        self.formula_file = f"{formula_path}/{formula_file}"
+        self.solver = Solver()
+        print(f"---Loading formula from {self.formula_file}---")
+        self.solver.from_file(self.formula_file)
+        self.vars = z3tools.get_variables(self.solver)
+        self.data = data
 
-        self.pos_data = pos_data if pos_data else None
-        self.neg_data = neg_data if neg_data else None
         if model:
             self.model = model
 
@@ -23,16 +27,12 @@ class PAModel:
         self.model = torch.load(path)
 
     def train(self, epochs=100):
-
-        if self.pos_data is None or self.neg_data is None:
+        if self.data is None:
             raise ValueError("Training data not provided")
         
-        X = torch.cat([self.pos_data, self.neg_data])
-        y = torch.cat([
-            torch.ones(len(self.pos_data)), 
-            torch.zeros(len(self.neg_data))
-        ]).unsqueeze(1)
-        
+        X = self.data[0]
+        y = self.data[1]
+
         # 训练过程
         optimizer = torch.optim.Adam(self.model.parameters())
         loss_fn = nn.BCELoss()
@@ -52,15 +52,25 @@ class PAModel:
         return self.model.predict(inputs)
         
     def verify(self, inputs):
-        """使用逻辑技术判断"""
-        if not all(isinstance(i, int) for i in inputs):
-            raise ValueError("Inputs must be integers")
-            
-        s = Solver()
-        s.add(self.z3_formula)
-        for var, val in zip(self.vars, inputs):
-            s.add(self.z3_vars[var] == val)  # 关键点3：直接使用整数比较
-        return s.check() == sat
+        """
+        检查输入的整数向量是否满足当前求解器的约束条件
+        :param inputs: 字典形式，例如 {'x': 1, 'y': 2}
+        :return: True 如果满足约束，否则 False
+        """
+        # 创建临时求解器用于验证（避免污染原求解器状态）
+        temp_solver = Solver()
+        for assertion in self.solver.assertions():
+            temp_solver.add(assertion)
+        
+        for var_name, value in inputs.items():
+            # 检查变量是否在集合中
+            var = next((v for v in self.vars if str(v) == var_name), None)
+            if var is not None:
+                temp_solver.add(var == value)
+            else:
+                raise ValueError(f"变量 {var_name} 不在模型中")
+        
+        return temp_solver.check() == sat
     
     def add_example(self, example, is_positive=True):
         """添加数据样例"""
@@ -70,32 +80,22 @@ class PAModel:
         else:
             self.negative_examples.append(tensor)
 
-    def update(self, new_pos_data, new_neg_data):
-        """
-        合并新数据并重新训练模型
-        :param new_pos_data: 新增正例集（整数列表/张量）
-        :param new_neg_data: 新增反例集（整数列表/张量）
-        """
-        # 验证并转换新数据为整数张量
-        new_pos = self._validate_int_data(new_pos_data) if new_pos_data else None
-        new_neg = self._validate_int_data(new_neg_data) if new_neg_data else None
+    def update(self, new_data):
         
         # 合并数据（处理初始为空的情况）
-        self.pos_data = torch.cat([self.pos_data, new_pos]) if self.pos_data is not None else new_pos
-        self.neg_data = torch.cat([self.neg_data, new_neg]) if self.neg_data is not None else new_neg
+        self.data[0] = torch.cat([self.data[0], new_data[0]]) if self.data is not None else new_data[0]
+        self.data[1] = torch.cat([self.data[1], new_data[1]]) if self.data is not None else new_data[1]
         
         # 重新训练模型
         self.train()
 
         # TODO: 训练策略改为增量学习
 
-    def save_config(self, file_path, save_weights=True):
+    def save_config(self, file_path=None):
+        if file_path is None:
+            file_path = f"{model_path}/{self.formula_str}.pth"
         file_path = f"{model_path}/{file_path}"
-        if save_weights:
-            # 保存模型权重
-            torch.save(self.model, file_path)
-        else:
-            torch.save(self.model.state_dict(), file_path)
+        torch.save(self.model.state_dict(), file_path)
 
 # def combine_presburger_models(M1, M2):
 #     """
@@ -127,20 +127,3 @@ class PAModel:
 #     # 创建新模型实例
 #     integrated_nn = IntegratedModel(M1, M2)
 #     return PAModel(integrated_nn, new_formula, new_vars)
-
-if __name__ == "__main__":
-    # 定义整数变量和公式
-    vars = ['x', 'y', 'z']
-    formula = "x + y == z"
-
-    # 整数训练数据
-    pos_data = [[1,2,3], [0,0,0]]  # 满足公式的整数示例
-    neg_data = [[1,1,3], [2,2,5]]  # 不满足的整数示例
-
-    # 创建并训练模型
-    model = PAModel(vars, formula, pos_data, neg_data)
-    model.train(epochs=50)
-
-    # 测试（必须输入整数）
-    print(model.predict([2,3,5]))  # 输出1（满足）
-    print(model.verify([2,3,5]))   # 输出True
